@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador por DNI con Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            text-align: left;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="login-container">
+    <h1>Iniciar Sesión</h1>
+    <input type="text" id="usuario" placeholder="Usuario">
+    <input type="password" id="contrasena" placeholder="Contraseña">
+    <button onclick="iniciarSesion()">Ingresar</button>
+    <div id="mensaje-error" class="result hidden"></div>
+</div>
+
+<div class="container hidden" id="buscador-container">
+    <h1>Buscador por DNI</h1>
+    <input type="text" id="dni" placeholder="Ingrese el DNI">
+    <button onclick="buscarDNI()">Buscar</button>
+    <div id="resultado" class="result"></div>
+</div>
+
+<script>
+    let usuariosValidos = {};
+    let baseDeDatos = {};
+    let datosCargados = false;
+
+    async function cargarDatos() {
+        try {
+            console.log("Cargando datos...");
+            
+            const usuariosResponse = await fetch('usuarios.txt');
+            if (!usuariosResponse.ok) throw new Error("Error al cargar usuarios.txt");
+            const usuariosText = await usuariosResponse.text();
+            usuariosText.split('\n').forEach(line => {
+                const [user, pass] = line.split(',');
+                if (user && pass) {
+                    usuariosValidos[user.trim()] = pass.trim();
+                }
+            });
+            console.log("Usuarios cargados:", usuariosValidos);
+            
+            const dniResponse = await fetch('base_datos.txt');
+            if (!dniResponse.ok) throw new Error("Error al cargar base_datos.txt");
+            const dniText = await dniResponse.text();
+            let filas = dniText.split('\n');
+            let headers = filas[0].split(',');
+            
+            for (let i = 1; i < filas.length; i++) {
+                let datos = filas[i].split(',');
+                if (datos.length === headers.length) {
+                    let dni = datos[8]?.trim().replace(/\D/g, ""); // Elimina caracteres no numéricos
+                    if (dni) {
+                        baseDeDatos[dni] = {};
+                        headers.forEach((header, index) => {
+                            baseDeDatos[dni][header.trim()] = datos[index]?.trim() || "";
+                        });
+                    }
+                }
+            }
+            console.log("DNI cargados:", Object.keys(baseDeDatos).slice(0, 10));
+            
+            datosCargados = true;
+            console.log("Datos cargados completamente");
+        } catch (error) {
+            console.error("Error al cargar los datos:", error);
+            alert("Hubo un error al cargar los datos. Verifique que los archivos existen y tienen el formato correcto.");
+        }
+    }
+
+    window.onload = cargarDatos;
+
+    function iniciarSesion() {
+        if (!datosCargados) {
+            alert("Los datos aún se están cargando. Intente de nuevo en unos segundos.");
+            return;
+        }
+
+        const usuario = document.getElementById('usuario').value;
+        const contrasena = document.getElementById('contrasena').value;
+        const mensajeError = document.getElementById('mensaje-error');
+        const loginContainer = document.getElementById('login-container');
+        const buscadorContainer = document.getElementById('buscador-container');
+
+        if (usuariosValidos[usuario] && usuariosValidos[usuario] === contrasena) {
+            loginContainer.classList.add('hidden');
+            buscadorContainer.classList.remove('hidden');
+            mensajeError.classList.add('hidden');
+        } else {
+            mensajeError.textContent = "Usuario o contraseña incorrectos.";
+            mensajeError.classList.remove('hidden');
+        }
+    }
+
+    function buscarDNI() {
+        if (!datosCargados) {
+            alert("Los datos aún se están cargando. Intente de nuevo en unos segundos.");
+            return;
+        }
+
+        const dni = document.getElementById('dni').value.trim().replace(/\D/g, "");
+        const resultadoDiv = document.getElementById('resultado');
+
+        console.log("DNI ingresado:", dni);
+        console.log("Existe en baseDeDatos:", baseDeDatos.hasOwnProperty(dni));
+
+        if (baseDeDatos[dni]) {
+            let datos = baseDeDatos[dni];
+            let resultadoHTML = "<strong>Datos encontrados:</strong><br><br>";
+            for (let key in datos) {
+                resultadoHTML += `<strong>${key}:</strong> ${datos[key]}<br>`;
+            }
+            resultadoDiv.innerHTML = resultadoHTML;
+        } else {
+            resultadoDiv.innerHTML = "DNI no encontrado.";
+        }
+    }
+</script>
+
+</body>
+</html>
